@@ -52,10 +52,10 @@ export class CalendarService {
     if (dayOfWeek === 0) return false; // Domingo cerrado
 
     if (dayOfWeek === 4) {
-      return hour >= 9 && hour < 14; // Jueves hasta 2pm
+      return hour >= 9 && hour < 14; // Jueves de 9am a 2pm
     }
 
-    return hour >= 9 && hour < 19; // Otros días hasta 7pm
+    return hour >= 9 && hour < 19; // Lunes a Sábado de 9am a 7pm
   }
 
   static async createAppointmentEvent(data: {
@@ -98,13 +98,14 @@ export class CalendarService {
   }
 
   static async getAvailableSlots(dateStr: string, durationMinutes: number = 50): Promise<string[]> {
-    const targetDate = new Date(`${dateStr}T00:00:00`);
-    const dayOfWeek = targetDate.getDay();
+    const targetDate = new Date(`${dateStr}T00:00:00-05:00`);
+    const limaDate = new Date(targetDate.toLocaleString('en-US', { timeZone: 'America/Lima' }));
+    const dayOfWeek = limaDate.getDay();
 
     if (dayOfWeek === 0) return []; // Domingo cerrado
 
     const startHour = 9;
-    const endHour = dayOfWeek === 4 ? 13 : 17; // Jueves hasta 13h, otros días hasta 17h
+    const endHour = dayOfWeek === 4 ? 14 : 19; // Jueves hasta 14h, otros días hasta 19h
 
     const timeMin = new Date(`${dateStr}T00:00:00-05:00`).toISOString();
     const timeMax = new Date(`${dateStr}T23:59:59-05:00`).toISOString();
@@ -122,21 +123,22 @@ export class CalendarService {
         });
         busyEvents = response.data.items || [];
       } catch (error: any) {
-        console.error('⚠️ Google Calendar API error (usando slots por defecto de horario de atención):', error.message || error);
+        console.error('⚠️ Google Calendar API error (usando slots por defecto):', error.message || error);
       }
-    } else {
-      console.warn('⚠️ Google Calendar no configurado. Mostrando horarios estándar de atención.');
     }
 
     const durationMs = durationMinutes * 60 * 1000;
     const availableSlots: string[] = [];
+    const endLimit = new Date(`${dateStr}T${endHour.toString().padStart(2, '0')}:00:00-05:00`);
 
     for (let hour = startHour; hour < endHour; hour++) {
       for (const minute of [0, 30]) {
-        const slotStart = new Date(`${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00-05:00`);
+        const slotStartStr = `${dateStr}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00-05:00`;
+        const slotStart = new Date(slotStartStr);
         const slotEnd = new Date(slotStart.getTime() + durationMs);
 
-        if (slotEnd.getHours() > endHour || (slotEnd.getHours() === endHour && slotEnd.getMinutes() > 0)) continue;
+        // No permitir citas que terminen después del cierre
+        if (slotEnd.getTime() > endLimit.getTime()) continue;
 
         const isBusy = busyEvents.some((event) => {
           if (!event.start?.dateTime || !event.end?.dateTime) return false;

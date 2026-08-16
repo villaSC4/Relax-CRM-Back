@@ -5,6 +5,16 @@ import { CalendarService } from '../services/calendar.service';
 import { pool } from '../config/database';
 import { RowDataPacket } from 'mysql2';
 
+function parseToLimaDate(rawInput: string): Date {
+  let clean = rawInput.toString().replace(/hrs|horas/gi, '').trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(clean)) {
+    clean = clean.replace(' ', 'T');
+    if (clean.length === 16) clean += ':00';
+    clean += '-05:00';
+  }
+  return new Date(clean);
+}
+
 function formatToMySQLDateTime(d: Date): string {
   const limaStr = d.toLocaleString('en-CA', {
     timeZone: 'America/Lima',
@@ -58,18 +68,17 @@ export class CRMAppointmentController {
 
       const service = serviceRows[0];
 
-      // Parsear fecha y hora flexiblemente
+      // Parsear fecha y hora en zona horaria oficial de Perú (-05:00)
       let start: Date;
       const rawStart = body.startTime || body.start_time;
       const rawDate = body.date || body.sessionDate;
       const rawTime = body.time || body.slot || body.hour;
 
       if (rawStart) {
-        const cleanRaw = rawStart.toString().replace(/hrs|horas/gi, '').trim();
-        start = new Date(cleanRaw);
+        start = parseToLimaDate(rawStart);
       } else if (rawDate && rawTime) {
         const cleanSlot = rawTime.toString().replace(/[^\d:]/g, '').trim();
-        start = new Date(`${rawDate}T${cleanSlot}:00-05:00`);
+        start = parseToLimaDate(`${rawDate}T${cleanSlot}:00`);
       } else {
         return res.status(400).json({ success: false, message: 'Debe seleccionar fecha y hora para la sesión' });
       }
