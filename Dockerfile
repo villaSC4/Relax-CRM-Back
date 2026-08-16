@@ -18,16 +18,17 @@ RUN apt-get update \
 
 # Configuración de Puppeteer para usar el Chromium instalado en el sistema
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_ENV=production
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --include=dev
 
 COPY . .
 RUN npm run build
+
+ENV NODE_ENV=production
 
 EXPOSE 3001
 
