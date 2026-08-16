@@ -1,4 +1,4 @@
-﻿import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, LocalAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import { ClientRepository } from '../repositories/client.repository';
 import { ChatRepository } from '../repositories/chat.repository';
@@ -7,21 +7,23 @@ export class WhatsAppService {
   private static client: Client;
 
   static async init() {
-    this.client = new Client({
-      authStrategy: new LocalAuth({ dataPath: './auth_info_wwebjs' }),
-      puppeteer: {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-        ],
-      },
-    });
+    try {
+      this.client = new Client({
+        authStrategy: new LocalAuth({ dataPath: process.env.WWEBJS_AUTH_PATH || './auth_info_wwebjs' }),
+        puppeteer: {
+          headless: true,
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu',
+          ],
+        },
+      });
 
     this.client.on('qr', (qr) => {
       console.log('\n📲 ESCANEA ESTE CÓDIGO QR CON WHATSAPP RELAX (912 680 658):');
@@ -74,7 +76,12 @@ export class WhatsAppService {
       }
     });
 
-    this.client.initialize();
+      this.client.initialize().catch((err) => {
+        console.error('⚠️ Error al iniciar cliente de WhatsApp Web:', err.message);
+      });
+    } catch (err: any) {
+      console.error('⚠️ Error en la configuración de WhatsAppService:', err.message);
+    }
   }
 
   static async sendMessage(target: string, text: string) {

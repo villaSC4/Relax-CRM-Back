@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection, pool } from './config/database';
@@ -41,11 +41,30 @@ app.get('/api/v1/crm/services', async (req, res) => {
   }
 });
 
+// Health check y estado del servidor
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    name: 'RELAX by QMEDIC CRM API',
+    uptime: `${Math.floor(process.uptime())}s`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, async () => {
   await testConnection();
   console.log(`🌿 Servidor CRM RELAX by QMEDIC corriendo en el puerto ${PORT}`);
 
-  await WhatsAppService.init();
+  try {
+    await WhatsAppService.init();
+  } catch (err: any) {
+    console.error('⚠️ Error al iniciar WhatsAppService:', err.message);
+  }
 });
+

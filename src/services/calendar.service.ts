@@ -1,13 +1,29 @@
-﻿import { google } from 'googleapis';
+import { google } from 'googleapis';
 import path from 'path';
 
 const KEYFILEPATH = path.join(__dirname, '../../google-credentials.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: KEYFILEPATH,
-  scopes: SCOPES,
-});
+let auth: any;
+
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  try {
+    const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: SCOPES,
+    });
+  } catch (err) {
+    console.error('⚠️ Error al leer GOOGLE_CREDENTIALS_JSON:', err);
+  }
+}
+
+if (!auth) {
+  auth = new google.auth.GoogleAuth({
+    keyFile: KEYFILEPATH,
+    scopes: SCOPES,
+  });
+}
 
 const calendar = google.calendar({ version: 'v3', auth });
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'aaronpalominod34@gmail.com';
