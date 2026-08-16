@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { ClientRepository } from '../repositories/client.repository';
 import { AppointmentRepository } from '../repositories/appointment.repository';
 import { CalendarService } from '../services/calendar.service';
@@ -102,12 +102,16 @@ export class CRMAppointmentController {
       let durationMinutes = 50;
 
       if (serviceId) {
-        const [serviceRows] = await pool.query<RowDataPacket[]>(
-          'SELECT duration_minutes FROM services WHERE id = ? LIMIT 1',
-          [serviceId]
-        );
-        if (serviceRows.length > 0) {
-          durationMinutes = serviceRows[0].duration_minutes;
+        try {
+          const [serviceRows] = await pool.query<RowDataPacket[]>(
+            'SELECT duration_minutes FROM services WHERE id = ? LIMIT 1',
+            [serviceId]
+          );
+          if (serviceRows && serviceRows.length > 0) {
+            durationMinutes = serviceRows[0].duration_minutes;
+          }
+        } catch (dbErr: any) {
+          console.warn('⚠️ No se pudo consultar duración del servicio en BD (usando 50 min):', dbErr.message);
         }
       }
 

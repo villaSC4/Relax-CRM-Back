@@ -2,7 +2,9 @@ import { google } from 'googleapis';
 import path from 'path';
 import fs from 'fs';
 
-const KEYFILEPATH = path.join(__dirname, '../../google-credentials.json');
+const KEYFILEPATH = fs.existsSync(path.resolve(process.cwd(), 'google-credentials.json'))
+  ? path.resolve(process.cwd(), 'google-credentials.json')
+  : path.resolve(__dirname, '../../google-credentials.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 let auth: any = null;

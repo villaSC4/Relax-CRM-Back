@@ -13,7 +13,14 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  })
+);
+app.options('*', cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -55,11 +62,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   await testConnection();
-  console.log(`🌿 Servidor CRM RELAX by QMEDIC corriendo en el puerto ${PORT}`);
+  console.log(`🌿 Servidor CRM RELAX by QMEDIC corriendo en 0.0.0.0:${PORT}`);
 
   try {
     await WhatsAppService.init();
