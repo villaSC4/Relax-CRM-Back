@@ -42,16 +42,20 @@ const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'aaronpalominod34@gmail.co
 
 export class CalendarService {
   static isWithinWorkingHours(dateInput: Date): boolean {
-    const dayOfWeek = dateInput.getDay();
-    const hour = dateInput.getHours();
+    if (isNaN(dateInput.getTime())) return false;
 
-    if (dayOfWeek === 0) return false;
+    const limaStr = dateInput.toLocaleString('en-US', { timeZone: 'America/Lima' });
+    const limaDate = new Date(limaStr);
+    const dayOfWeek = limaDate.getDay();
+    const hour = limaDate.getHours();
+
+    if (dayOfWeek === 0) return false; // Domingo cerrado
 
     if (dayOfWeek === 4) {
-      return hour >= 9 && hour < 13;
+      return hour >= 9 && hour < 14; // Jueves hasta 2pm
     }
 
-    return hour >= 9 && hour < 17;
+    return hour >= 9 && hour < 19; // Otros días hasta 7pm
   }
 
   static async createAppointmentEvent(data: {

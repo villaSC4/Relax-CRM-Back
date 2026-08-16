@@ -5,6 +5,20 @@ import { CalendarService } from '../services/calendar.service';
 import { pool } from '../config/database';
 import { RowDataPacket } from 'mysql2';
 
+function formatToMySQLDateTime(d: Date): string {
+  const limaStr = d.toLocaleString('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  return limaStr.replace(',', '').trim();
+}
+
 export class CRMAppointmentController {
   static async getAllAppointments(req: Request, res: Response) {
     try {
@@ -18,10 +32,19 @@ export class CRMAppointmentController {
 
   static async createAppointment(req: Request, res: Response) {
     try {
-      const { fullName, phone, email, startTime, serviceId, notes } = req.body;
+      const body = req.body || {};
+      const fullName = body.fullName || body.clientName || body.name || 'Cliente RELAX';
+      const phone = (body.phone || body.telephone || body.clientPhone || '').toString().trim();
+      const email = body.email || body.clientEmail || null;
+      const notes = body.notes || null;
+      const serviceId = Number(body.serviceId || body.service_id);
 
       if (!serviceId) {
         return res.status(400).json({ success: false, message: 'Debe seleccionar un servicio' });
+      }
+
+      if (!phone) {
+        return res.status(400).json({ success: false, message: 'Debe ingresar un número de teléfono / WhatsApp' });
       }
 
       const [serviceRows] = await pool.query<RowDataPacket[]>(
@@ -34,13 +57,33 @@ export class CRMAppointmentController {
       }
 
       const service = serviceRows[0];
-      const start = new Date(startTime);
+
+      // Parsear fecha y hora flexiblemente
+      let start: Date;
+      const rawStart = body.startTime || body.start_time;
+      const rawDate = body.date || body.sessionDate;
+      const rawTime = body.time || body.slot || body.hour;
+
+      if (rawStart) {
+        const cleanRaw = rawStart.toString().replace(/hrs|horas/gi, '').trim();
+        start = new Date(cleanRaw);
+      } else if (rawDate && rawTime) {
+        const cleanSlot = rawTime.toString().replace(/[^\d:]/g, '').trim();
+        start = new Date(`${rawDate}T${cleanSlot}:00-05:00`);
+      } else {
+        return res.status(400).json({ success: false, message: 'Debe seleccionar fecha y hora para la sesión' });
+      }
+
+      if (isNaN(start.getTime())) {
+        return res.status(400).json({ success: false, message: 'Formato de fecha u horario inválido' });
+      }
+
       const end = new Date(start.getTime() + service.duration_minutes * 60 * 1000);
 
       if (!CalendarService.isWithinWorkingHours(start)) {
         return res.status(400).json({
           success: false,
-          message: 'El horario está fuera del rango de atención de RELAX (Jueves hasta 2pm, otros días hasta 6pm)',
+          message: 'El horario seleccionado está fuera del rango de atención de RELAX (Lunes a Sábado hasta 7pm, Jueves hasta 2pm)',
         });
       }
 
@@ -65,13 +108,15 @@ export class CRMAppointmentController {
       const appointmentId = await AppointmentRepository.create({
         client_id: clientId,
         service_id: serviceId,
-        start_time: start,
-        end_time: end,
+        start_time: formatToMySQLDateTime(start),
+        end_time: formatToMySQLDateTime(end),
         status: 'CONFIRMED',
         price_paid: service.price,
-        google_event_id: googleEventId,
+        google_event_id: googleEventId || null,
         notes,
       });
+
+      console.log(`✅ Cita agendada #${appointmentId} para ${fullName} (${service.name}) el ${formatToMySQLDateTime(start)}`);
 
       return res.status(201).json({
         success: true,
@@ -82,9 +127,9 @@ export class CRMAppointmentController {
         duration: `${service.duration_minutes} min`,
         price: `S/ ${service.price}`,
       });
-    } catch (error) {
-      console.error('Error al agendar sesión RELAX:', error);
-      return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    } catch (error: any) {
+      console.error('❌ Error al agendar sesión RELAX:', error.message || error);
+      return res.status(500).json({ success: false, message: error.message || 'Error interno del servidor al agendar sesión' });
     }
   }
 
