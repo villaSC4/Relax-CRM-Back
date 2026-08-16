@@ -40,6 +40,21 @@ if (!auth && fs.existsSync(KEYFILEPATH)) {
 const calendar = auth ? google.calendar({ version: 'v3', auth }) : null;
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'aaronpalominod34@gmail.com';
 
+function formatToLimaISO(d: Date): string {
+  const limaStr = d.toLocaleString('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const [datePart, timePart] = limaStr.split(', ');
+  return `${datePart}T${timePart}-05:00`;
+}
+
 export class CalendarService {
   static isWithinWorkingHours(dateInput: Date): boolean {
     if (isNaN(dateInput.getTime())) return false;
@@ -80,13 +95,18 @@ export class CalendarService {
         Duración: ${data.durationMinutes} min
       `;
 
+      const startISO = formatToLimaISO(data.startTime);
+      const endISO = formatToLimaISO(data.endTime);
+
+      console.log(`📅 Enviando evento a Google Calendar: ${startISO} - ${endISO}`);
+
       const response = await calendar.events.insert({
         calendarId: CALENDAR_ID,
         requestBody: {
           summary,
           description,
-          start: { dateTime: data.startTime.toISOString(), timeZone: 'America/Lima' },
-          end: { dateTime: data.endTime.toISOString(), timeZone: 'America/Lima' },
+          start: { dateTime: startISO, timeZone: 'America/Lima' },
+          end: { dateTime: endISO, timeZone: 'America/Lima' },
         },
       });
 

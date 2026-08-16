@@ -18,6 +18,8 @@ export const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  timezone: '-05:00',
+  dateStrings: true,
   ssl: isRemote ? { rejectUnauthorized: false } : undefined,
 });
 
