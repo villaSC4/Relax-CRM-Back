@@ -1,31 +1,41 @@
 import { google } from 'googleapis';
 import path from 'path';
+import fs from 'fs';
 
 const KEYFILEPATH = path.join(__dirname, '../../google-credentials.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
-let auth: any;
+let auth: any = null;
 
 if (process.env.GOOGLE_CREDENTIALS_JSON) {
   try {
     const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    if (credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
     auth = new google.auth.GoogleAuth({
       credentials,
       scopes: SCOPES,
     });
-  } catch (err) {
-    console.error('⚠️ Error al leer GOOGLE_CREDENTIALS_JSON:', err);
+    console.log('✅ Google Calendar Auth cargado desde GOOGLE_CREDENTIALS_JSON.');
+  } catch (err: any) {
+    console.error('⚠️ Error al parsear GOOGLE_CREDENTIALS_JSON:', err.message);
   }
 }
 
-if (!auth) {
-  auth = new google.auth.GoogleAuth({
-    keyFile: KEYFILEPATH,
-    scopes: SCOPES,
-  });
+if (!auth && fs.existsSync(KEYFILEPATH)) {
+  try {
+    auth = new google.auth.GoogleAuth({
+      keyFile: KEYFILEPATH,
+      scopes: SCOPES,
+    });
+    console.log('✅ Google Calendar Auth cargado desde archivo local google-credentials.json.');
+  } catch (err: any) {
+    console.error('⚠️ Error al cargar google-credentials.json:', err.message);
+  }
 }
 
-const calendar = google.calendar({ version: 'v3', auth });
+const calendar = auth ? google.calendar({ version: 'v3', auth }) : null;
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'aaronpalominod34@gmail.com';
 
 export class CalendarService {
@@ -50,6 +60,11 @@ export class CalendarService {
     startTime: Date;
     endTime: Date;
   }): Promise<string | undefined> {
+    if (!calendar) {
+      console.warn('⚠️ Google Calendar no está autenticado. La cita se guardará en MySQL sin sincronizar con Google.');
+      return undefined;
+    }
+
     try {
       const summary = `RELAX Sesión: ${data.clientName}`;
       const description = `
@@ -70,8 +85,8 @@ export class CalendarService {
       });
 
       return response.data.id || undefined;
-    } catch (error) {
-      console.error('Error al insertar evento en Google Calendar:', error);
+    } catch (error: any) {
+      console.error('❌ Error al insertar evento en Google Calendar:', error.message || error);
       return undefined;
     }
   }
@@ -80,23 +95,33 @@ export class CalendarService {
     const targetDate = new Date(`${dateStr}T00:00:00`);
     const dayOfWeek = targetDate.getDay();
 
-    if (dayOfWeek === 0) return [];
+    if (dayOfWeek === 0) return []; // Domingo cerrado
 
     const startHour = 9;
-    const endHour = dayOfWeek === 4 ? 13 : 17;
+    const endHour = dayOfWeek === 4 ? 13 : 17; // Jueves hasta 13h, otros días hasta 17h
 
     const timeMin = new Date(`${dateStr}T00:00:00-05:00`).toISOString();
     const timeMax = new Date(`${dateStr}T23:59:59-05:00`).toISOString();
 
-    const response = await calendar.events.list({
-      calendarId: CALENDAR_ID,
-      timeMin,
-      timeMax,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    let busyEvents: any[] = [];
 
-    const busyEvents = response.data.items || [];
+    if (calendar) {
+      try {
+        const response = await calendar.events.list({
+          calendarId: CALENDAR_ID,
+          timeMin,
+          timeMax,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+        busyEvents = response.data.items || [];
+      } catch (error: any) {
+        console.error('⚠️ Google Calendar API error (usando slots por defecto de horario de atención):', error.message || error);
+      }
+    } else {
+      console.warn('⚠️ Google Calendar no configurado. Mostrando horarios estándar de atención.');
+    }
+
     const durationMs = durationMinutes * 60 * 1000;
     const availableSlots: string[] = [];
 
