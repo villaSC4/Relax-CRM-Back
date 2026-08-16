@@ -74,3 +74,11 @@ app.listen(PORT, '0.0.0.0', async () => {
   }
 });
 
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception capturada (evitando caída del servidor):', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection capturada en:', promise, 'motivo:', reason);
+});
+

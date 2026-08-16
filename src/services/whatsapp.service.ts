@@ -7,6 +7,11 @@ export class WhatsAppService {
   private static client: Client;
 
   static async init() {
+    if (process.env.ENABLE_WHATSAPP === 'false') {
+      console.log('ℹ️ WhatsAppService desactivado por variable ENABLE_WHATSAPP=false');
+      return;
+    }
+
     try {
       this.client = new Client({
         authStrategy: new LocalAuth({ dataPath: process.env.WWEBJS_AUTH_PATH || './auth_info_wwebjs' }),
@@ -20,7 +25,19 @@ export class WhatsAppService {
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
+            '--single-process',
             '--disable-gpu',
+            '--disable-extensions',
+            '--disable-software-rasterizer',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--hide-scrollbars',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--safebrowsing-disable-auto-update',
+            '--js-flags=--max-old-space-size=128',
           ],
         },
       });
